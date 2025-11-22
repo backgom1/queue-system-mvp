@@ -55,7 +55,7 @@ Case 1 : 대기열 없이 입장하는 경우
       "data": {
           "currentRank": 0,          
           "accessToken": accessToken,
-          "redirectUrl": "https://ticket.api.com/"
+          "redirectUrl": "https://ticket.api.com/api/v1/ticket/entry"
       } 
     }
   ```
@@ -64,21 +64,97 @@ Case 2 : 대기열 입장하는 경우
   ```
   EnterQueueResponse {
     "resultCode": "QUEUE_WAIT"
-    "message": "대기열에 등록되었습니다.",
+    "message": "대기열 등록이 필요합니다.",
     "data": {
-        "queueToken": "abc-123-def-456",  // ★ 핵심: SSE 연결용 토큰
+        "queueToken": "abc-123-def-456",
         "currentRank": 150,             
-        "sseUrl": "https://queue.api.com/queue/connect"
+        "sseUrl": "https://queue.api.com/api/v1/queue/connect"
     } 
   }
   ```
 
+#### 순번 확인 API
 
+대기 중인 유저가 서버와 지속적인 연결을 맺고 자신의 순번을 실시간으로 수신합니다.
 
-- 순번 확인 API
+요청
+- 메서드 : GET
+- URL : /api/v1/queue/connect
+- 헤더 :
+  - Authorization: Bearer {queueToken}
+  - Accept : text/event-stream
+
+응답
+  - 상태 코드 : 200 OK
+  - Content-Type : text/event-stream
+  
+
+  Case 1 : 대기 중 (event: waiting)
+  ```
+  ConnectQueueResponse {
+     "rank": 150
+  }
+  ```
+
+  Case 2 : 입장 허가 (event: admission)
+  ```
+  ConnectQueueResponse {
+     "accessToken": "final-access-token-xyz",
+     "redirectUrl": "https://ticket.api.com/api/v1/ticket/entry"
+  }
+  ```
+
+  Case 3 : 에러 (event: error)
+  ```
+   ProblemDetail {
+      "code": "INVALID_TOKEN",
+      "message": "대기열 토큰이 만료되었습니다."
+   }
+  ```
+  
+
 ### 4.2. Ticket Server
-- 예매 페이지 입장 API
+#### 예매 페이지 입장 API
+요청
+- 메서드 : POST
+- URL : /api/v1/ticket/entry
+- 헤더 :
+  - Authorization: Bearer {accessToken}
+  - Content-Type: application/json
 
+
+응답 
+
+  Case 1 : 정상 진입 (유효한 토큰)
+  - 상태 코드 : 200 OK
+  - 설명 : 토큰 검증 성공. Redis의 활성 유저(Active User) TTL을 갱신하고 남은 시간을 반환합니다.
+  ```
+  EnterTicketResponse {
+    "resultCode": "ACCESS_ALLOWED",
+    "message": "예매 페이지 진입 성공",
+    "data": {
+        "userUuid": "user-1234",
+        "contentId": "concert-iu-2025",
+        "validUntil": "2025-11-23T12:40:00", 
+        "remainingSeconds": 600        
+    } 
+  }
+  ```
+
+  Case 2 : 진입 거부 (토큰 만료/위조/접근 불가)
+  - 상태 코드 : 401 Unauthorized
+  - 설명 : 대기열을 거치지 않았거나, 유효 시간이 만료된 경우 대기열로 다시 보냅니다.
+  ```
+    ProblemDetail {
+      "code": "ACCESS_DENIED",
+      "message": "유효하지 않은 접근이거나 세션이 만료되었습니다.",
+      "data": {
+        "redirectUrl": "https://queue.api.com/api/v1/queue/enter
+      }
+    }
+  ```
+  
+  
 ## 5. 컴포넌트 설계서
 ### 5.1. Ticket Server
 - 타임아웃 감지
