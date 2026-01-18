@@ -185,7 +185,7 @@ Case 2 : 대기열 입장하는 경우
 2.  **대기열 동작 검증**: 모든 인원이 정상적으로 `WAIT` 상태를 거쳐 순차적으로 `PROCEED` → `DONE`으로 처리되는지 확인.
 3.  **처리량(Throughput) 측정**: 시스템이 설정된 처리 속도(초당 N명)를 안정적으로 유지하는지 모니터링.
 
-### 🛠 k6 시나리오 설정 (`k6/load-test.js`)
+### k6 시나리오 설정 (`k6/load-test.js`)
 
 ```javascript
 export const options = {
