@@ -23,6 +23,7 @@ public class QueueScheduler {
         int allowCount = 10; // 한 번에 입장시킬 인원
         try {
             queueService.activateTokens(allowCount);
+            queueService.completeExpiredTokens(); // 추가: 완료 처리 시뮬레이션
             notifyWaitingOrder();
         } catch (Exception e) {
             log.error("Queue activation failed", e);
@@ -31,14 +32,18 @@ public class QueueScheduler {
 
     private void notifyWaitingOrder() {
         // SSE에 연결된 사용자들 중, 아직 대기 상태인 사용자에게 순번 발송
-        sseEmitterService.getEmitters().forEach((userId, emitter) -> {
+        sseEmitterService.getEmitters().forEach((userUuid, emitter) -> {
             try {
-                long rank = queueService.calculateRank(userId);
+                long rank = queueService.calculateRank(userUuid);
                 if (rank > 0) {
-                    sseEmitterService.send(userId, "QueueUpdate", rank);
+                    sseEmitterService.send(userUuid, "waiting", rank);
                 } else {
-                    // 순번이 0이면 이미 진입했거나 다른 상태 -> 완료 알림 보내도 됨
-                    sseEmitterService.send(userId, "QueueUpdate", "Entered");
+                    // 순번이 0이면 입장 허가! 명세에 따른 데이터 전송
+                    java.util.Map<String, String> data = java.util.Map.of(
+                        "accessToken", java.util.UUID.randomUUID().toString(),
+                        "redirectUrl", "/api/v1/ticket/entry" // 실제 티켓 예매 경로
+                    );
+                    sseEmitterService.send(userUuid, "admission", data); 
                 }
             } catch (Exception e) {
                 // 특정 유저 오류는 무시하고 계속 진행

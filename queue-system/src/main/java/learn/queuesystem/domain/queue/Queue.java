@@ -21,7 +21,10 @@ public class Queue {
     private Long id;
 
     @Column(nullable = false)
-    private Long userId;
+    private String userUuid;
+
+    @Column(nullable = false)
+    private String contentId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -33,17 +36,15 @@ public class Queue {
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    private Queue(Long userId) {
-        validateUserId(userId);
-        this.userId = userId;
+    private Queue(String userUuid, String contentId) {
+        validateUserUuid(userUuid);
+        this.userUuid = userUuid;
+        this.contentId = contentId;
         this.status = QueueStatus.WAIT;
     }
 
-    /**
-     * 새로운 대기열 생성 (정적 팩토리 메서드)
-     */
-    public static Queue wait(Long userId) {
-        return new Queue(userId);
+    public static Queue wait(String userUuid, String contentId) {
+        return new Queue(userUuid, contentId);
     }
 
     /**
@@ -67,9 +68,9 @@ public class Queue {
         this.status = QueueStatus.DONE;
     }
 
-    private void validateUserId(Long userId) {
-        if (userId == null || userId <= 0) {
-            throw new IllegalArgumentException("유효하지 않은 사용자 ID입니다.");
+    private void validateUserUuid(String userUuid) {
+        if (userUuid == null || userUuid.isBlank()) {
+            throw new IllegalArgumentException("유효하지 않은 사용자 UUID입니다.");
         }
     }
 }

@@ -3,6 +3,8 @@ package learn.queuesystem.domain.queue;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.util.UUID;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -12,13 +14,15 @@ class QueueTest {
     @DisplayName("대기열 생성 시 초기 상태는 WAIT이어야 한다")
     void createQueue_waitStatus() {
         // given
-        Long userId = 1L;
+        String userUuid = UUID.randomUUID().toString();
+        String contentId = "concert-1";
 
         // when
-        Queue queue = Queue.wait(userId);
+        Queue queue = Queue.wait(userUuid, contentId);
 
         // then
-        assertThat(queue.getUserId()).isEqualTo(userId);
+        assertThat(queue.getUserUuid()).isEqualTo(userUuid);
+        assertThat(queue.getContentId()).isEqualTo(contentId);
         assertThat(queue.getStatus()).isEqualTo(QueueStatus.WAIT);
     }
 
@@ -26,7 +30,7 @@ class QueueTest {
     @DisplayName("WAIT 상태에서 PROCEED로 전환할 수 있다")
     void proceed_success() {
         // given
-        Queue queue = Queue.wait(1L);
+        Queue queue = Queue.wait(UUID.randomUUID().toString(), "concert-1");
 
         // when
         queue.proceed();
@@ -40,7 +44,7 @@ class QueueTest {
     @DisplayName("WAIT가 아닌 상태에서 PROCEED로 전환하면 예외가 발생한다")
     void proceed_fail() {
         // given
-        Queue queue = Queue.wait(1L);
+        Queue queue = Queue.wait(UUID.randomUUID().toString(), "concert-1");
         queue.proceed(); // PROCEED 상태
 
         // when & then
