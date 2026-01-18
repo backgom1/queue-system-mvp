@@ -24,7 +24,9 @@
 
 
 <img width="693" height="515" alt="image" src="https://github.com/user-attachments/assets/ccf0279a-1dbf-4551-8438-6e3ecd26ffc1" />
+
 - 기존 방식으로 하나의 모듈로 작업을 진행하려했지만, 서버 부하의 테스트를 정확하게 해보고싶고 역할을 나누고싶다는 생각때문에 해당 아키텍처를 구성했습니다.
+- 최소 기능 개발로 모놀로그 형식으로 DB+Server -> Redis + Server -> Server1(Ticket) + Server2(Queue) + Redis 점진적인 구현을 할 예정입니다.
 
 ## 4. API 설계
 ### 4.1. Queue Server
