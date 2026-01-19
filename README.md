@@ -241,3 +241,6 @@ export const options = {
 *   **Waiting이 줄지 않음**: 스케줄러가 죽었거나 DB 락으로 인해 처리가 멈춘 상태.
 *   **Proceeding이 급증함**: 처리 용량 제한 로직이 깨져서 서버가 폭주하는 상태.
 *   **k6 에러율 증가**: DB Connection Pool 고갈 또는 타임아웃 발생.
+
+#### 분석 결과 및 회고
+https://silvercastle.notion.site/2ec1dc39fd1e80e5ba10ee23fad56021?pvs=73
