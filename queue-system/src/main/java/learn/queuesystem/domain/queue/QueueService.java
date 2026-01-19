@@ -1,18 +1,24 @@
 package learn.queuesystem.domain.queue;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.persistence.EntityNotFoundException;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
 @Service
-@RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class QueueService {
 
     private final QueueRepository queueRepository;
+    private final MeterRegistry meterRegistry;
+
+    public QueueService(QueueRepository queueRepository, MeterRegistry meterRegistry) {
+        this.queueRepository = queueRepository;
+        this.meterRegistry = meterRegistry;
+    }
 
     /**
      * 대기열 진입 요청
@@ -23,6 +29,11 @@ public class QueueService {
      */
     @Transactional
     public Queue enterQueue(String userUuid, String contentId) {
+        Counter.builder("queue.enter.request")
+            .tag("contentId", contentId)
+            .register(meterRegistry)
+            .increment();
+
         return queueRepository.findByUserUuid(userUuid)
             .orElseGet(() -> {
                 Queue newQueue = Queue.wait(userUuid, contentId);

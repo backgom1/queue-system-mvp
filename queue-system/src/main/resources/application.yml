@@ -40,3 +40,8 @@ logging:
   level:
     org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql: TRACE
+
+server:
+  tomcat:
+    mbeanregistry:
+      enabled: true
