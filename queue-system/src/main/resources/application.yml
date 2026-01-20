@@ -3,6 +3,12 @@ spring:
     name: queue-system
   
   datasource:
+    hikari:
+      maximum-pool-size: 50
+      minimum-idle: 50
+      connection-timeout: 3000
+      idle-timeout: 600000
+      max-lifetime: 1800000
     url: jdbc:postgresql://localhost:5432/postgres
     driver-class-name: org.postgresql.Driver
     username: "eunseong"
