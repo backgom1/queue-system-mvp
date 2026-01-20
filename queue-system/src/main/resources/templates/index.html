@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Queue System MVP</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .status-card { transition: all 0.3s ease; }
+        #waitingArea { display: none; }
+    </style>
+</head>
+<body class="bg-light">
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-body text-center">
+                    <h2 class="card-title mb-4">Concert Reservation</h2>
+                    <p class="text-muted">User ID: <span id="displayUuid" th:text="${userUuid}" class="fw-bold text-primary"></span></p>
+
+                    <!-- Step 1: Entry Button -->
+                    <div id="entryArea">
+                        <button id="btnEnter" class="btn btn-primary btn-lg w-100">Enter Queue</button>
+                    </div>
+
+                    <!-- Step 2: Waiting Status -->
+                    <div id="waitingArea" class="mt-4">
+                        <div class="alert alert-warning">
+                            <h4 class="alert-heading">Waiting...</h4>
+                            <p class="mb-0 fs-3">Your Rank: <span id="currentRank" class="fw-bold">?</span></p>
+                        </div>
+                        <div class="spinner-border text-warning" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2">Please do not close this page.</p>
+                    </div>
+
+                    <!-- Step 3: Success -->
+                    <div id="successArea" style="display: none;" class="mt-4">
+                        <div class="alert alert-success">
+                            <h4 class="alert-heading">Admission Granted!</h4>
+                            <p>You can now proceed to the ticket page.</p>
+                            <a id="btnRedirect" href="#" class="btn btn-success btn-lg w-100">Go to Reservation</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const userUuid = document.getElementById('displayUuid').innerText;
+    const btnEnter = document.getElementById('btnEnter');
+    const entryArea = document.getElementById('entryArea');
+    const waitingArea = document.getElementById('waitingArea');
+    const successArea = document.getElementById('successArea');
+    const rankDisplay = document.getElementById('currentRank');
+    const btnRedirect = document.getElementById('btnRedirect');
+
+    btnEnter.onclick = async () => {
+        const response = await fetch('/api/v1/queue/enter', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userUuid: userUuid, contentId: 'concert-iu-2025' })
+        });
+
+        const result = await response.json();
+        
+        if (result.resultCode === 'QUEUE_WAIT') {
+            entryArea.style.display = 'none';
+            waitingArea.style.display = 'block';
+            rankDisplay.innerText = result.data.currentRank;
+            connectSse();
+        } else if (result.resultCode === 'ENTRY_GRANTED') {
+            showSuccess(result.data.redirectUrl);
+        }
+    };
+
+    function connectSse() {
+        const eventSource = new EventSource(`/api/v1/queue/connect?userUuid=${userUuid}`);
+
+        eventSource.addEventListener('waiting', (event) => {
+            rankDisplay.innerText = event.data;
+        });
+
+        eventSource.addEventListener('admission', (event) => {
+            const data = JSON.parse(event.data);
+            eventSource.close();
+            showSuccess(data.redirectUrl);
+        });
+
+        eventSource.onerror = (error) => {
+            console.error('SSE Error:', error);
+            // eventSource.close();
+        };
+    }
+
+    function showSuccess(url) {
+        entryArea.style.display = 'none';
+        waitingArea.style.display = 'none';
+        successArea.style.display = 'block';
+        btnRedirect.href = url;
+    }
+</script>
+
+</body>
+</html>
