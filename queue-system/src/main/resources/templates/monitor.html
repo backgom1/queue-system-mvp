@@ -104,12 +104,14 @@
             chart.data.labels.push(now);
             chart.data.datasets[0].data.push(stats.waiting);
             chart.data.datasets[1].data.push(stats.proceeding);
+            chart.data.datasets[2].data.push(stats.done);
 
             // 데이터가 너무 많으면 앞부분 제거
             if (chart.data.labels.length > 50) {
                 chart.data.labels.shift();
                 chart.data.datasets[0].data.shift();
                 chart.data.datasets[1].data.shift();
+                chart.data.datasets[2].data.shift();
             }
 
             chart.update();

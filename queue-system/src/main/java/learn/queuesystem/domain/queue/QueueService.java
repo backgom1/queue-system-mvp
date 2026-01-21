@@ -2,82 +2,129 @@ package learn.queuesystem.domain.queue;
 
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
-import jakarta.persistence.EntityNotFoundException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
+import java.time.LocalDateTime;
+import java.util.Set;
 
+@Slf4j
 @Service
 @Transactional(readOnly = true)
 public class QueueService {
 
-    private final QueueRepository queueRepository;
+    private final WaitingQueueRepository waitingQueueRepository;
     private final MeterRegistry meterRegistry;
 
-    public QueueService(QueueRepository queueRepository, MeterRegistry meterRegistry) {
-        this.queueRepository = queueRepository;
+    private static final String WAIT_KEY_PREFIX = "queue:wait:";
+
+    public QueueService(
+            WaitingQueueRepository waitingQueueRepository,
+            MeterRegistry meterRegistry) {
+        this.waitingQueueRepository = waitingQueueRepository;
         this.meterRegistry = meterRegistry;
     }
 
-    /**
-     * 대기열 진입 요청
-     * 정책:
-     * 1. 이미 진입/대기 중인 경우 해당 정보 반환
-     * 2. 대기열이 없고 여유가 있다면 바로 진입(PROCEED) 상태로 생성 (이번 MVP에선 일단 무조건 WAIT로 시작하고 스케줄러가 넘겨주는 방식으로 단순화 가능하지만,
-     *    명세에 "바로 입장" 케이스가 있으므로, 현재 대기자가 0명인 경우 바로 PROCEED로 생성하는 로직 추가 가능)
-     */
-    @Transactional
-    public Queue enterQueue(String userUuid, String contentId) {
-        Counter.builder("queue.enter.request")
-            .tag("contentId", contentId)
-            .register(meterRegistry)
-            .increment();
-
-        return queueRepository.findByUserUuid(userUuid)
-            .orElseGet(() -> {
-                Queue newQueue = Queue.wait(userUuid, contentId);
-                return queueRepository.save(newQueue);
-            });
+    private String getWaitKey(String contentId) {
+        return WAIT_KEY_PREFIX + contentId;
     }
 
-    public Queue getQueueInfo(String userUuid) {
-        return queueRepository.findByUserUuid(userUuid)
-            .orElseThrow(() -> new EntityNotFoundException("대기열 정보가 존재하지 않습니다. uuid=" + userUuid));
+    public Long enterQueue(String userUuid, String contentId) {
+        Counter.builder("queue.enter.request")
+                .tag("contentId", contentId)
+                .register(meterRegistry)
+                .increment();
+
+        if (Boolean.TRUE.equals(waitingQueueRepository.hasActiveToken(userUuid))) {
+            waitingQueueRepository.remove(getWaitKey(contentId), userUuid);
+        }
+
+        waitingQueueRepository.register(getWaitKey(contentId), userUuid);
+
+
+        return waitingQueueRepository.getRank(getWaitKey(contentId), userUuid);
     }
 
     public long calculateRank(String userUuid) {
-        Queue queue = getQueueInfo(userUuid);
-        if (queue.getStatus() != QueueStatus.WAIT) {
-            return 0; 
+        String contentId = waitingQueueRepository.getUserContent(userUuid);
+        if (contentId == null) {
+            return 0;
         }
-        return queueRepository.countByStatusAndCreatedAtBefore(QueueStatus.WAIT, queue.getCreatedAt());
+        return calculateRankWithContentId(contentId, userUuid);
     }
 
-    @Transactional
+    public long calculateRankWithContentId(String contentId, String userUuid) {
+        String key = getWaitKey(contentId);
+        Long rank = waitingQueueRepository.getRank(key, userUuid);
+        return (rank == null) ? 0 : rank + 1;
+    }
+
     public void activateTokens(int count) {
-        var pageable = org.springframework.data.domain.PageRequest.of(0, count);
-        var waitingQueues = queueRepository.findByStatusOrderByCreatedAtAsc(QueueStatus.WAIT, pageable);
-        waitingQueues.forEach(Queue::proceed);
+        //현재 count만큼의 앞순서 불러오기
+        Set<String> activeContentIds = waitingQueueRepository.getActiveContents();
+
+        for (String contentId : activeContentIds) {
+            activateTokensForContent(contentId, count);
+        }
+    }
+
+    public void activateTokensForContent(String contentId, int count) {
+        String key = getWaitKey(contentId);
+        Set<String> targets = waitingQueueRepository.getTopMembers(key, count);
+
+        if (targets == null || targets.isEmpty()) {
+            waitingQueueRepository.removeContent(contentId);
+            return;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        for (String userUuid : targets) {
+
+            waitingQueueRepository.remove(key, userUuid);
+            long expireAt = System.currentTimeMillis() + 5000;
+            waitingQueueRepository.addActiveToken(userUuid, expireAt);
+        }
+
+        log.info("Activated {} users for contentId: {}", targets.size(), contentId);
     }
 
     @Transactional
     public void completeExpiredTokens() {
-        // 진입 후 5초가 지나면 완료(DONE) 처리 시뮬레이션
-        java.time.LocalDateTime threshold = java.time.LocalDateTime.now().minusSeconds(5);
-        List<Queue> proceedingQueues = queueRepository.findByStatus(QueueStatus.PROCEED);
-        proceedingQueues.stream()
-            .filter(q -> q.getEnteredAt() != null && q.getEnteredAt().isBefore(threshold))
-            .forEach(Queue::complete);
+        long now = System.currentTimeMillis();
+        Set<String> expiredUsers = waitingQueueRepository.popExpiredActiveTokens(now);
+
+        if (expiredUsers.isEmpty()) {
+            return;
+        }
+
+        for (String userUuid : expiredUsers) {
+            String contentId = waitingQueueRepository.getUserContent(userUuid);
+            if (contentId != null) {
+                waitingQueueRepository.incrementDoneCount(contentId);
+            }
+        }
+
+        log.info("Completed {} expired tokens", expiredUsers.size());
     }
 
-    public record QueueStats(long waiting, long proceeding, long done) {}
+    public record QueueStats(long waiting, long proceeding, long done) {
+    }
+
+    public boolean isAllowed(String userUuid) {
+        return Boolean.TRUE.equals(waitingQueueRepository.hasActiveToken(userUuid));
+    }
 
     public QueueStats getStats() {
-        return new QueueStats(
-            queueRepository.countByStatus(QueueStatus.WAIT),
-            queueRepository.countByStatus(QueueStatus.PROCEED),
-            queueRepository.countByStatus(QueueStatus.DONE)
-        );
+        long waiting = 0;
+        Set<String> activeContents = waitingQueueRepository.getActiveContents();
+        for (String contentId : activeContents) {
+            waiting += waitingQueueRepository.getQueueSize(getWaitKey(contentId));
+        }
+
+        long proceeding = waitingQueueRepository.getActiveTokenSize();
+        long done = waitingQueueRepository.getDoneCount();
+
+        return new QueueStats(waiting, proceeding, done);
     }
 }

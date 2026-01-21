@@ -56,12 +56,8 @@ export default function () {
     sleep(1); // 1초 대기
     attempt++;
 
-    // 순번 확인 (여기서는 MVP API 한계로 enter를 다시 호출하여 상태를 확인하거나, connect API를 찌름)
-    // /enter API는 "이미 대기 중이면 정보 반환" 정책이므로 이를 활용
-    // 혹은 원래 의도대로라면 /connect는 SSE 스트림이라 k6로 응답 파싱이 까다로움.
-    // 따라서, /enter를 다시 호출해서 반환되는 rank 정보를 확인하는 것이 가장 확실함.
-    
-    const pollRes = http.post(`${BASE_URL}/enter`, payload, params);
+    // 순번 확인 (새로 추가된 /rank API 사용)
+    const pollRes = http.get(`${BASE_URL}/rank?userUuid=${userUuid}&contentId=${CONTENT_ID}`, params);
     
     if (pollRes.status === 200) {
       const pollBody = pollRes.json();
@@ -74,6 +70,7 @@ export default function () {
       // 여전히 대기 중
       else if (pollBody.resultCode === 'QUEUE_WAIT') {
          // 계속 대기
+         // 만약 rank가 0이고 resultCode가 WAIT라면? -> 재진입 로직 필요할 수도 있지만 일단 대기
       }
     } else {
       // 에러 발생 시 루프 탈출

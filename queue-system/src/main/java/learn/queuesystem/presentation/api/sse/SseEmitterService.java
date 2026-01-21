@@ -12,41 +12,43 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 public class SseEmitterService {
 
-    // UserUuid -> SseEmitter
-    private final Map<String, SseEmitter> emitters = new ConcurrentHashMap<>();
+    /**
+     * 사용자 정보를 담는 내부 클래스
+     */
+    public record UserSession(String userUuid, String contentId, SseEmitter emitter) {}
+
+    // UserUuid -> UserSession
+    private final Map<String, UserSession> sessions = new ConcurrentHashMap<>();
     private static final long TIMEOUT = 60 * 1000L; // 1분
 
-    public SseEmitter connect(String userUuid) {
+    public SseEmitter connect(String userUuid, String contentId) {
         SseEmitter emitter = new SseEmitter(TIMEOUT);
-        emitters.put(userUuid, emitter);
+        sessions.put(userUuid, new UserSession(userUuid, contentId, emitter));
 
-        // 연결 종료/타임아웃 시 제거
-        emitter.onCompletion(() -> emitters.remove(userUuid));
-        emitter.onTimeout(() -> emitters.remove(userUuid));
-        emitter.onError((e) -> emitters.remove(userUuid));
+        emitter.onCompletion(() -> sessions.remove(userUuid));
+        emitter.onTimeout(() -> sessions.remove(userUuid));
+        emitter.onError((e) -> sessions.remove(userUuid));
 
-        // 초기 연결 성공 메시지 전송 (명세에 맞게 JSON 형태가 좋지만 일단 텍스트)
         send(userUuid, "connected", "Connection Established");
 
         return emitter;
     }
 
     public void send(String userUuid, String name, Object data) {
-        SseEmitter emitter = emitters.get(userUuid);
-        if (emitter != null) {
+        UserSession session = sessions.get(userUuid);
+        if (session != null) {
             try {
-                emitter.send(SseEmitter.event()
+                session.emitter().send(SseEmitter.event()
                     .name(name)
                     .data(data));
             } catch (IOException e) {
                 log.warn("Failed to send SSE to user {}", userUuid);
-                emitters.remove(userUuid);
+                sessions.remove(userUuid);
             }
         }
     }
     
-    // 현재 접속중인 모든 사용자 ID 반환 (알림 발송용)
-    public Map<String, SseEmitter> getEmitters() {
-        return emitters;
+    public Map<String, UserSession> getSessions() {
+        return sessions;
     }
 }

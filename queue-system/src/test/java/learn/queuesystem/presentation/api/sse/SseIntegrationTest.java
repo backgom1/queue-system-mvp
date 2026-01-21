@@ -3,14 +3,16 @@ package learn.queuesystem.presentation.api.sse;
 import learn.queuesystem.domain.queue.Queue;
 import learn.queuesystem.domain.queue.QueueRepository;
 import learn.queuesystem.domain.queue.QueueScheduler;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mock;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.WebApplicationContext;
 
 import java.util.UUID;
 
@@ -21,14 +23,21 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Transactional
 class SseIntegrationTest {
 
-    @Mock
     private MockMvc mockMvc;
+
+    @Autowired
+    private WebApplicationContext context;
 
     @Autowired
     private QueueRepository queueRepository;
 
     @Autowired
     private QueueScheduler queueScheduler;
+
+    @BeforeEach
+    void setUp() {
+        mockMvc = MockMvcBuilders.webAppContextSetup(context).build();
+    }
 
     @Test
     @DisplayName("사용자는 SSE에 연결하고 스케줄러 실행 시 순번 알림을 받아야 한다")
