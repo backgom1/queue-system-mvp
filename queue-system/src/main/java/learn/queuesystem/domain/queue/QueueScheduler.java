@@ -47,10 +47,14 @@ public class QueueScheduler {
     @Scheduled(fixedDelay = 1000)
     public void scheduleActivation() {
         Sample sample = Timer.start(meterRegistry);
-        Random random = new Random();
-        int allowCount = random.nextInt(10) + 40;
+        int allowCount = new Random().nextInt(10) + 40;
         try {
-            activateTokens(allowCount);
+            // 1. 입장할 사람들을 뽑아서 입장 처리 (Admission)
+            processAdmission(allowCount);
+
+            // 2. 아직 남아있는 사람들에게 순번 알림 (Rank Notification)
+            notifyWaitingOrder();
+
             updateMetrics();
         } catch (Exception e) {
             log.error("Queue activation failed", e);
@@ -59,30 +63,33 @@ public class QueueScheduler {
         }
     }
 
-    private void activateTokens(int count) {
-        // 1. Redis에서 즉시 추출 및 삭제 (원자적 작업)
-        Set<ZSetOperations.TypedTuple<String>> targets = waitingQueueRepository.popMin("queue:wait:concert-iu-2025", count);
+    private void processAdmission(int count) {
+        String key = "queue:wait:concert-iu-2025";
+        // popMin으로 대기열에서 아예 제거 (Admission 권한 획득)
+        Set<ZSetOperations.TypedTuple<String>> targets = waitingQueueRepository.popMin(key, count);
 
         if (targets == null || targets.isEmpty()) return;
 
         for (ZSetOperations.TypedTuple<String> tuple : targets) {
             String userUuid = tuple.getValue();
-            Long rank = waitingQueueRepository.getRank("queue:wait:concert-iu-2025", userUuid);
-
             waitingQueueRepository.addActiveToken(userUuid, 300);
 
-            if (rank > 0) {
-                sseEmitterService.send(userUuid, "waiting", rank);
-            } else {
-
-                Map<String, String> data = java.util.Map.of(
-                        "accessToken", java.util.UUID.randomUUID().toString(),
-                        "redirectUrl", "/api/v1/ticket/entry"
-                );
-                // 3. SSE 알림 발송 (이후 설명할 비동기 처리 권장)
-                sseEmitterService.send(userUuid, "admission", data);
-            }
+            Map<String, String> data = Map.of(
+                    "accessToken", java.util.UUID.randomUUID().toString(),
+                    "redirectUrl", "/api/v1/ticket/entry"
+            );
+            sseEmitterService.send(userUuid, "admission", data);
         }
+    }
+
+    private void notifyWaitingOrder() {
+        String key = "queue:wait:concert-iu-2025";
+        sseEmitterService.getSessions().forEach((userUuid, emitter) -> {
+            Long rank = waitingQueueRepository.getRank(key, userUuid);
+            if (rank != null) {
+                sseEmitterService.send(userUuid, "waiting", rank + 1);
+            }
+        });
     }
 
     private void updateMetrics() {
