@@ -1,18 +1,18 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Queue Monitor - Realtime Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Queue Monitor V2</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="bg-dark text-white">
-
 <div class="container py-5">
     <div class="row mb-4">
         <div class="col">
-            <h1 class="display-4">🚀 Queue System Dashboard</h1>
-            <p class="lead">Real-time monitoring of load test (k6)</p>
+            <h1 class="display-5">Queue System V2 Dashboard</h1>
+            <p class="lead mb-0">contentId: <span id="contentIdLabel">concert-iu-2025</span></p>
         </div>
     </div>
 
@@ -21,41 +21,44 @@
             <div class="card bg-secondary mb-3 shadow">
                 <div class="card-body">
                     <h5 class="card-title text-warning">WAITING</h5>
-                    <h2 id="waitCount" class="display-5 fw-bold">0</h2>
+                    <h2 id="waitCount" class="display-6 fw-bold">0</h2>
                 </div>
             </div>
         </div>
         <div class="col-md-4">
             <div class="card bg-secondary mb-3 shadow">
                 <div class="card-body">
-                    <h5 class="card-title text-success">PROCEEDING</h5>
-                    <h2 id="proceedCount" class="display-5 fw-bold">0</h2>
+                    <h5 class="card-title text-success">ACTIVE TICKETS</h5>
+                    <h2 id="activeTicketCount" class="display-6 fw-bold">0</h2>
                 </div>
             </div>
         </div>
         <div class="col-md-4">
             <div class="card bg-secondary mb-3 shadow">
                 <div class="card-body">
-                    <h5 class="card-title text-info">DONE</h5>
-                    <h2 id="doneCount" class="display-5 fw-bold">0</h2>
+                    <h5 class="card-title text-info">ACTIVE TOKENS</h5>
+                    <h2 id="activeTokenCount" class="display-6 fw-bold">0</h2>
                 </div>
             </div>
         </div>
     </div>
 
     <div class="row">
-        <div class="col-md-12">
+        <div class="col-12">
             <div class="card bg-light p-4 shadow">
-                <canvas id="queueChart" style="height: 400px; width: 100%;"></canvas>
+                <canvas id="queueChart" style="height: 380px; width: 100%;"></canvas>
             </div>
         </div>
     </div>
 </div>
 
 <script>
+    const CONTENT_ID = 'concert-iu-2025';
+    document.getElementById('contentIdLabel').innerText = CONTENT_ID;
+
     const waitCountEl = document.getElementById('waitCount');
-    const proceedCountEl = document.getElementById('proceedCount');
-    const doneCountEl = document.getElementById('doneCount');
+    const activeTicketCountEl = document.getElementById('activeTicketCount');
+    const activeTokenCountEl = document.getElementById('activeTokenCount');
 
     const ctx = document.getElementById('queueChart').getContext('2d');
     const chart = new Chart(ctx, {
@@ -71,9 +74,16 @@
                     fill: true
                 },
                 {
-                    label: 'Proceeding',
+                    label: 'Active Tickets',
                     borderColor: 'rgb(40, 167, 69)',
                     backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                    data: [],
+                    fill: true
+                },
+                {
+                    label: 'Active Tokens',
+                    borderColor: 'rgb(23, 162, 184)',
+                    backgroundColor: 'rgba(23, 162, 184, 0.1)',
                     data: [],
                     fill: true
                 }
@@ -85,28 +95,33 @@
                 x: { display: false },
                 y: { beginAtZero: true }
             },
-            animation: { duration: 0 } // 실시간 반응을 위해 애니메이션 끔
+            animation: { duration: 0 }
         }
     });
 
     async function updateStats() {
         try {
-            const response = await fetch('/api/v1/queue/stats');
-            const stats = await response.json();
+            const response = await fetch(`/api/v2/queue/stats?contentId=${encodeURIComponent(CONTENT_ID)}`);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
 
-            // 숫자 텍스트 업데이트
-            waitCountEl.innerText = stats.waiting.toLocaleString();
-            proceedCountEl.innerText = stats.proceeding.toLocaleString();
-            doneCountEl.innerText = stats.done.toLocaleString();
+            const body = await response.json();
+            const stats = body?.data;
+            if (!stats) {
+                throw new Error('invalid stats payload');
+            }
 
-            // 차트 업데이트
+            waitCountEl.innerText = Number(stats.waiting || 0).toLocaleString();
+            activeTicketCountEl.innerText = Number(stats.activeTickets || 0).toLocaleString();
+            activeTokenCountEl.innerText = Number(stats.activeTokens || 0).toLocaleString();
+
             const now = new Date().toLocaleTimeString();
             chart.data.labels.push(now);
-            chart.data.datasets[0].data.push(stats.waiting);
-            chart.data.datasets[1].data.push(stats.proceeding);
-            chart.data.datasets[2].data.push(stats.done);
+            chart.data.datasets[0].data.push(stats.waiting || 0);
+            chart.data.datasets[1].data.push(stats.activeTickets || 0);
+            chart.data.datasets[2].data.push(stats.activeTokens || 0);
 
-            // 데이터가 너무 많으면 앞부분 제거
             if (chart.data.labels.length > 50) {
                 chart.data.labels.shift();
                 chart.data.datasets[0].data.shift();
@@ -116,13 +131,13 @@
 
             chart.update();
         } catch (error) {
-            console.error('Failed to fetch stats:', error);
+            console.error('Failed to fetch v2 stats:', error);
         }
     }
 
-    // 0.5초마다 업데이트
-    setInterval(updateStats, 500);
+    setInterval(updateStats, 3000);
+    updateStats();
 </script>
-
 </body>
 </html>
+ㅌ

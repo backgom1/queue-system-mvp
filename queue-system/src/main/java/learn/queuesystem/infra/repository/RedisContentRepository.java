@@ -1,4 +1,4 @@
-package learn.queuesystem.infrastructure.persistence;
+package learn.queuesystem.infra.repository;
 
 import learn.queuesystem.domain.ticket.ContentRepository;
 import org.springframework.data.redis.core.StringRedisTemplate;

@@ -1,12 +1,16 @@
 package learn.queuesystem.domain.queue;
 
+import learn.queuesystem.application.service.QueueServiceV1;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.UUID;
 import java.util.stream.IntStream;
 
@@ -14,20 +18,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
 @Transactional
-@org.springframework.test.context.ActiveProfiles("test")
-class QueueServiceTest {
+@ActiveProfiles("test")
+class QueueServiceV1Test {
 
     @Autowired
-    private QueueService queueService;
+    private QueueServiceV1 queueServiceV1;
 
     @Autowired
-    private QueueRepository queueRepository;
+    private StringRedisTemplate redisTemplate;
 
-    @Autowired
-    private org.springframework.data.redis.core.StringRedisTemplate redisTemplate;
-
-    @org.junit.jupiter.api.BeforeEach
+    @BeforeEach
     void clearRedis() {
+        Assertions.assertNotNull(redisTemplate.getConnectionFactory());
         redisTemplate.getConnectionFactory().getConnection().flushAll();
     }
 
@@ -37,20 +39,23 @@ class QueueServiceTest {
         // given: 10명의 대기자 생성
         int totalUsers = 10;
         String contentId = "concert-1";
-        
+
         IntStream.rangeClosed(1, totalUsers).forEach(i -> {
-            queueService.enterQueue(UUID.randomUUID().toString(), contentId);
+            queueServiceV1.enterQueue(UUID.randomUUID().toString(), contentId);
             // 생성 시간 차이를 두기 위해 잠시 대기
-            try { Thread.sleep(10); } catch (InterruptedException ignored) {}
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException ignored) {
+            }
         });
 
         // when: 5명 활성화
         int activeCount = 5;
-        queueService.activateTokens(activeCount);
+        queueServiceV1.activateTokens(activeCount);
 
         // then
-        QueueService.QueueStats stats = queueService.getStats();
-        
+        QueueServiceV1.QueueStats stats = queueServiceV1.getStats();
+
         assertThat(stats.proceeding()).isEqualTo(activeCount);
         assertThat(stats.waiting()).isEqualTo(totalUsers - activeCount);
     }

@@ -6,6 +6,7 @@ import learn.queuesystem.domain.ticket.ContentRepository;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
+import java.util.HashSet;
 import java.util.Set;
 
 @Component
@@ -23,12 +24,22 @@ public class ContentCreateStarter {
     @PostConstruct
     public void init() {
 
-        Set<String> keys = redisTemplate.keys("queue:*");
+        Set<String> keysToDelete = new HashSet<>();
+        addKeys(keysToDelete, "queue:*");
+        addKeys(keysToDelete, "token:*");
+        addKeys(keysToDelete, "active:*");
 
-        if (keys != null && !keys.isEmpty()) {
-            redisTemplate.delete(keys);
+        if (!keysToDelete.isEmpty()) {
+            redisTemplate.delete(keysToDelete);
         }
 
         contentRepository.saveContent("concert-iu-2025");
+    }
+
+    private void addKeys(Set<String> keysToDelete, String pattern) {
+        Set<String> keys = redisTemplate.keys(pattern);
+        if (keys != null && !keys.isEmpty()) {
+            keysToDelete.addAll(keys);
+        }
     }
 }

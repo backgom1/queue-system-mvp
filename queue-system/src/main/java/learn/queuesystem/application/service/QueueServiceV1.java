@@ -1,7 +1,7 @@
-package learn.queuesystem.domain.queue;
+package learn.queuesystem.application.service;
 
-import io.micrometer.core.instrument.Counter;
-import io.micrometer.core.instrument.MeterRegistry;
+import learn.queuesystem.domain.queue.WaitingQueueRepository;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -9,41 +9,26 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.Set;
 
+import static learn.queuesystem.infra.redis.QueueKeyGenerator.getWaitKey;
+
 @Slf4j
 @Service
-@Transactional(readOnly = true)
-public class QueueService {
+@RequiredArgsConstructor
+public class QueueServiceV1 {
 
     private final WaitingQueueRepository waitingQueueRepository;
-    private final MeterRegistry meterRegistry;
 
-    private static final String WAIT_KEY_PREFIX = "queue:wait:";
-
-    public QueueService(
-            WaitingQueueRepository waitingQueueRepository,
-            MeterRegistry meterRegistry) {
-        this.waitingQueueRepository = waitingQueueRepository;
-        this.meterRegistry = meterRegistry;
-    }
-
-    private String getWaitKey(String contentId) {
-        return WAIT_KEY_PREFIX + contentId;
-    }
-
+    @Transactional
     public Long enterQueue(String userUuid, String contentId) {
-        Counter.builder("queue.enter.request")
-                .tag("contentId", contentId)
-                .register(meterRegistry)
-                .increment();
 
         if (Boolean.TRUE.equals(waitingQueueRepository.hasActiveToken(userUuid))) {
             waitingQueueRepository.remove(getWaitKey(contentId), userUuid);
         }
 
-        waitingQueueRepository.register(getWaitKey(contentId), userUuid);
+        Long contentQueueSize = waitingQueueRepository.queueSize(getWaitKey(contentId));
 
 
-        return waitingQueueRepository.getRank(getWaitKey(contentId), userUuid);
+        return waitingQueueRepository.registerAndGetRank(getWaitKey(contentId), userUuid);
     }
 
     public long calculateRank(String userUuid) {

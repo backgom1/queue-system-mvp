@@ -1,9 +1,7 @@
-package learn.queuesystem.presentation.api.queue;
+package learn.queuesystem.presentation.api.queue.v1;
 
 import jakarta.validation.Valid;
-import learn.queuesystem.domain.queue.Queue;
-import learn.queuesystem.domain.queue.QueueService;
-import learn.queuesystem.domain.queue.QueueStatus;
+import learn.queuesystem.application.service.QueueServiceV1;
 import learn.queuesystem.presentation.api.queue.dto.EnterQueueRequest;
 import learn.queuesystem.presentation.api.queue.dto.EnterQueueResponse;
 import learn.queuesystem.presentation.api.sse.SseEmitterService;
@@ -18,14 +16,14 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/queue")
 @RequiredArgsConstructor
-public class QueueController {
+public class QueueControllerV1 {
 
-    private final QueueService queueService;
+    private final QueueServiceV1 queueServiceV1;
     private final SseEmitterService sseEmitterService;
 
     @PostMapping("/enter")
     public ResponseEntity<EnterQueueResponse> enterQueue(@RequestBody @Valid EnterQueueRequest request) {
-        Long queue = queueService.enterQueue(request.userUuid(), request.contentId());
+        Long queue = queueServiceV1.enterQueue(request.userUuid(), request.contentId());
 
         if (queue <= 50) {
             return ResponseEntity.ok(
@@ -57,13 +55,13 @@ public class QueueController {
     }
 
     @GetMapping("/stats")
-    public ResponseEntity<QueueService.QueueStats> getStats() {
-        return ResponseEntity.ok(queueService.getStats());
+    public ResponseEntity<QueueServiceV1.QueueStats> getStats() {
+        return ResponseEntity.ok(queueServiceV1.getStats());
     }
 
     @GetMapping("/rank")
     public ResponseEntity<EnterQueueResponse> getRank(@RequestParam String userUuid, @RequestParam String contentId) {
-        if (queueService.isAllowed(userUuid)) {
+        if (queueServiceV1.isAllowed(userUuid)) {
             return ResponseEntity.ok(
                     EnterQueueResponse.granted(
                             UUID.randomUUID().toString(),
@@ -72,7 +70,7 @@ public class QueueController {
             );
         }
 
-        long rank = queueService.calculateRankWithContentId(contentId, userUuid);
+        long rank = queueServiceV1.calculateRankWithContentId(contentId, userUuid);
         // 대기열에도 없고 활성화도 안 되었다면? (예: 만료됨 or 미진입) -> rank 0 처리 하거나 에러.
         // 여기서는 rank 0이면 일단 wait로 0번을 주거나.. 로직 정의 필요.
         // 만약 rank == 0 인데 isAllowed가 false라면, 대기열에서 튕겨나간 것임.

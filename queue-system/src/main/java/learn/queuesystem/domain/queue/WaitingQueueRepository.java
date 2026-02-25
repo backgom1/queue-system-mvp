@@ -5,17 +5,25 @@ import org.springframework.data.redis.core.ZSetOperations;
 import java.util.Set;
 
 public interface WaitingQueueRepository {
+
     void register(String key, String member);
+
+    Long registerAndGetRank(String key, String memberId);
 
     void remove(String key, String member);
 
     Long getRank(String key, String member);
 
+    Long queueSize(String key);
+
     Set<String> getTopMembers(String key, long count);
 
-    void registerContent(String contentId);
 
+    /*
+        활성화된 큐 정보를 가져옵니다.
+    */
     Set<String> getActiveContents();
+
 
     void removeContent(String contentId);
 
@@ -54,5 +62,20 @@ public interface WaitingQueueRepository {
     // [기존 메서드들 유지]
     long getDoneCount();
 
+    /*
+        선택한 상위 대기열을 가져오는 메서드
+     */
     Set<ZSetOperations.TypedTuple<String>> popMin(String key, int count);
+
+    void issueEnterTicket(String key, int ttl);
+
+    Boolean isActiveUser(String key);
+
+    void activeContent(String contentId);
+
+    void issueTokenKey(String tokenKey, String userUuidAndContentId, int ttl);
+
+    String getValue(String key);
+
+    long countKeysByPattern(String pattern);
 }

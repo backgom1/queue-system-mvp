@@ -14,6 +14,12 @@ public class IndexController {
         return "index";
     }
 
+    @GetMapping("/v2")
+    public String indexV2(Model model) {
+        model.addAttribute("userUuid", UUID.randomUUID().toString());
+        return "index2";
+    }
+
     @GetMapping("/monitor")
     public String monitor() {
         return "monitor";

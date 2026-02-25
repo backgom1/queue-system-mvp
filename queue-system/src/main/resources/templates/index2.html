@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Queue System V2</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(120deg, #f5f7fa 0%, #e4ecf5 100%);
+            min-height: 100vh;
+        }
+        #waitingArea, #successArea, #errorArea {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-12 col-md-7 col-lg-5">
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-4">
+                    <h2 class="h4 mb-3 text-center">Queue V2 Polling Demo</h2>
+                    <p class="text-muted mb-4 text-center">
+                        User: <span id="displayUuid" th:text="${userUuid}" class="fw-semibold"></span>
+                    </p>
+
+                    <div id="entryArea" class="d-grid">
+                        <button id="btnEnter" class="btn btn-primary btn-lg">Enter Queue</button>
+                    </div>
+
+                    <div id="waitingArea" class="mt-4">
+                        <div class="alert alert-warning mb-2">
+                            <div class="fw-bold">대기 중</div>
+                            <div>현재 순번: <span id="currentRank" class="fw-bold">-</span></div>
+                            <div>다음 조회: <span id="nextPoll" class="fw-bold">-</span> ms</div>
+                        </div>
+                        <div class="small text-muted">페이지를 닫지 마세요.</div>
+                    </div>
+
+                    <div id="successArea" class="mt-4">
+                        <div class="alert alert-success mb-2">
+                            <div class="fw-bold">입장 가능</div>
+                            <div>예약 페이지로 이동할 수 있습니다.</div>
+                        </div>
+                        <a id="btnRedirect" class="btn btn-success w-100" href="#">Go To Ticket</a>
+                    </div>
+
+                    <div id="errorArea" class="mt-4">
+                        <div class="alert alert-danger mb-0" id="errorMessage">요청 처리 중 오류가 발생했습니다.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const userUuid = document.getElementById('displayUuid').innerText.trim();
+    const contentId = 'concert-iu-2025';
+
+    const btnEnter = document.getElementById('btnEnter');
+    const entryArea = document.getElementById('entryArea');
+    const waitingArea = document.getElementById('waitingArea');
+    const successArea = document.getElementById('successArea');
+    const errorArea = document.getElementById('errorArea');
+    const errorMessage = document.getElementById('errorMessage');
+    const rankDisplay = document.getElementById('currentRank');
+    const nextPollDisplay = document.getElementById('nextPoll');
+    const btnRedirect = document.getElementById('btnRedirect');
+
+    let pollTimer = null;
+    let queueToken = null;
+
+    btnEnter.addEventListener('click', enterQueue);
+
+    async function enterQueue() {
+        clearPollTimer();
+        hideAll();
+        entryArea.style.display = 'none';
+
+        try {
+            const response = await fetch('/api/v2/queue/enter', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userUuid, contentId })
+            });
+
+            if (!response.ok) {
+                throw new Error('enter failed');
+            }
+
+            const body = await response.json();
+            const data = body?.data;
+            if (!data) {
+                throw new Error('invalid enter response');
+            }
+
+            queueToken = data.token;
+
+            if (isGranted(data)) {
+                showSuccess(data.redirectUrl);
+                return;
+            }
+
+            showWaiting(data.rank, data.nextPollMs);
+            scheduleStatusPoll(data.nextPollMs);
+        } catch (error) {
+            showError('입장 요청 실패: ' + error.message);
+        }
+    }
+
+    async function pollStatus() {
+        if (!queueToken) {
+            showError('queue token이 없습니다.');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/v2/queue/status?token=${encodeURIComponent(queueToken)}`);
+            if (!response.ok) {
+                throw new Error('status failed');
+            }
+
+            const body = await response.json();
+            const data = body?.data;
+            if (!data) {
+                throw new Error('invalid status response');
+            }
+
+            if (data.token) {
+                queueToken = data.token;
+            }
+
+            if (data.status === 'DONE') {
+                showSuccess(data.redirectUrl);
+                return;
+            }
+
+            showWaiting(data.rank, data.nextPollMs);
+            scheduleStatusPoll(data.nextPollMs);
+        } catch (error) {
+            showError('상태 조회 실패: ' + error.message);
+        }
+    }
+
+    function isGranted(data) {
+        return data.rank === 0 || data.nextPollMs === 0;
+    }
+
+    function showWaiting(rank, nextPollMs) {
+        hideAll();
+        waitingArea.style.display = 'block';
+        rankDisplay.innerText = rank ?? '-';
+        nextPollDisplay.innerText = normalizePoll(nextPollMs);
+    }
+
+    function showSuccess(url) {
+        clearPollTimer();
+        hideAll();
+        successArea.style.display = 'block';
+        btnRedirect.href = url || '#';
+    }
+
+    function showError(message) {
+        clearPollTimer();
+        hideAll();
+        errorArea.style.display = 'block';
+        errorMessage.innerText = message;
+        entryArea.style.display = 'grid';
+    }
+
+    function hideAll() {
+        waitingArea.style.display = 'none';
+        successArea.style.display = 'none';
+        errorArea.style.display = 'none';
+    }
+
+    function scheduleStatusPoll(nextPollMs) {
+        clearPollTimer();
+        pollTimer = setTimeout(pollStatus, normalizePoll(nextPollMs));
+    }
+
+    function clearPollTimer() {
+        if (pollTimer) {
+            clearTimeout(pollTimer);
+            pollTimer = null;
+        }
+    }
+
+    function normalizePoll(ms) {
+        if (!Number.isFinite(ms) || ms <= 0) return 1000;
+        return Math.max(200, ms);
+    }
+</script>
+</body>
+</html>

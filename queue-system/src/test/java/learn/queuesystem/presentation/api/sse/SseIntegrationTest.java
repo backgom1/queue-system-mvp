@@ -1,7 +1,6 @@
 package learn.queuesystem.presentation.api.sse;
 
 import learn.queuesystem.domain.queue.Queue;
-import learn.queuesystem.domain.queue.QueueRepository;
 import learn.queuesystem.domain.queue.QueueScheduler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

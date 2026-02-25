@@ -4,6 +4,7 @@ import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.Timer.Sample;
+import learn.queuesystem.application.service.QueueServiceV1;
 import learn.queuesystem.presentation.api.sse.SseEmitterService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
@@ -21,7 +22,7 @@ import java.util.concurrent.atomic.AtomicLong;
 @Profile("!test")
 public class QueueScheduler {
 
-    private final QueueService queueService;
+    private final QueueServiceV1 queueServiceV1;
     private final SseEmitterService sseEmitterService;
     private final MeterRegistry meterRegistry;
     private final WaitingQueueRepository waitingQueueRepository;
@@ -29,8 +30,8 @@ public class QueueScheduler {
     private final AtomicLong waitingQueueSize = new AtomicLong(0);
     private final AtomicLong proceedingQueueSize = new AtomicLong(0);
 
-    public QueueScheduler(QueueService queueService, SseEmitterService sseEmitterService, MeterRegistry meterRegistry, WaitingQueueRepository waitingQueueRepository) {
-        this.queueService = queueService;
+    public QueueScheduler(QueueServiceV1 queueServiceV1, SseEmitterService sseEmitterService, MeterRegistry meterRegistry, WaitingQueueRepository waitingQueueRepository) {
+        this.queueServiceV1 = queueServiceV1;
         this.sseEmitterService = sseEmitterService;
         this.meterRegistry = meterRegistry;
         this.waitingQueueRepository = waitingQueueRepository;
@@ -44,7 +45,7 @@ public class QueueScheduler {
                 .register(meterRegistry);
     }
 
-    @Scheduled(fixedDelay = 1000)
+//    @Scheduled(fixedDelay = 1000)
     public void scheduleActivation() {
         Sample sample = Timer.start(meterRegistry);
         int allowCount = new Random().nextInt(10) + 40;
@@ -65,7 +66,7 @@ public class QueueScheduler {
 
     private void processAdmission(int count) {
         String key = "queue:wait:concert-iu-2025";
-        // popMin으로 대기열에서 아예 제거 (Admission 권한 획득)
+
         Set<ZSetOperations.TypedTuple<String>> targets = waitingQueueRepository.popMin(key, count);
 
         if (targets == null || targets.isEmpty()) return;
@@ -93,7 +94,7 @@ public class QueueScheduler {
     }
 
     private void updateMetrics() {
-        var stats = queueService.getStats();
+        var stats = queueServiceV1.getStats();
         waitingQueueSize.set(stats.waiting());
         proceedingQueueSize.set(stats.proceeding());
     }
