@@ -1,20 +1,22 @@
 package learn.queuesystem.infra.repository;
 
-import learn.queuesystem.domain.queue.RedisPrefix;
 import learn.queuesystem.domain.queue.WaitingQueueRepository;
 import learn.queuesystem.infra.redis.QueueKeyGenerator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.*;
+import org.springframework.data.redis.core.RedisOperations;
+import org.springframework.data.redis.core.SessionCallback;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Repository;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 
-import static learn.queuesystem.domain.queue.RedisPrefix.*;
+import static learn.queuesystem.domain.queue.RedisPrefix.ACTIVE_CONTENTS;
+import static learn.queuesystem.domain.queue.RedisPrefix.WAIT_QUEUE;
 
 @Slf4j
 @Repository
@@ -66,11 +68,6 @@ public class RedisWaitingQueueRepository implements WaitingQueueRepository {
             """,
             List.class
     );
-
-    @Override
-    public void register(String key, String member) {
-        redisTemplate.opsForZSet().add(key, member, System.currentTimeMillis());
-    }
 
     @Override
     public Long registerAndGetRank(String key, String memberId) {
@@ -146,21 +143,6 @@ public class RedisWaitingQueueRepository implements WaitingQueueRepository {
     }
 
     @Override
-    public Boolean isActiveUser(String key) {
-        return redisTemplate.opsForValue().get(key) != null;
-    }
-
-    @Override
-    public void saveUserContent(String userUuid, String contentId) {
-        redisTemplate.opsForValue().set("queue:user:" + userUuid, contentId);
-    }
-
-    @Override
-    public Boolean hasUser(String userUuid) {
-        return redisTemplate.hasKey("queue:user:" + userUuid);
-    }
-
-    @Override
     public String getUserContent(String userUuid) {
         return redisTemplate.opsForValue().get("queue:user:" + userUuid);
     }
@@ -180,33 +162,6 @@ public class RedisWaitingQueueRepository implements WaitingQueueRepository {
     public Set<ZSetOperations.TypedTuple<String>> popMin(String key, int count) {
         return redisTemplate.opsForZSet().popMin(key, count);
     }
-
-    @Override
-    public void issueEnterTicket(String key, int ttl) {
-        redisTemplate.opsForValue()
-                .setIfAbsent(key, "1", ttl, TimeUnit.SECONDS);
-    }
-
-
-    /*
-        입장 대기열 (set)을 추가합니다.
-     */
-    @Override
-    public void activeContent(String contentId) {
-        redisTemplate.opsForSet().add(ACTIVE_CONTENTS.getKey(), contentId);
-    }
-
-    @Override
-    public void issueTokenKey(String key, String userUuidAndContentId, int ttl) {
-        redisTemplate.opsForValue()
-                .setIfAbsent(key, userUuidAndContentId, ttl, TimeUnit.SECONDS);
-    }
-
-    @Override
-    public String getValue(String key) {
-        return redisTemplate.opsForValue().get(key);
-    }
-
 
     @Override
     public Long enterQueueAtomically(String waitKey, String tokenKey, String tokenValue, String contentId, String userUuid, long nowMillis, int tokenTtlSeconds) {

@@ -7,8 +7,6 @@ import java.util.Set;
 
 public interface WaitingQueueRepository {
 
-    void register(String key, String member);
-
     Long registerAndGetRank(String key, String memberId);
 
     void remove(String key, String member);
@@ -18,7 +16,6 @@ public interface WaitingQueueRepository {
     Long queueSize(String key);
 
     Set<String> getTopMembers(String key, long count);
-
 
     /*
         활성화된 큐 정보를 가져옵니다.
@@ -45,15 +42,6 @@ public interface WaitingQueueRepository {
      */
     Boolean hasActiveToken(String userUuid);
 
-    /**
-     * 유저의 접속 정보(ContentId)를 캐싱합니다. (중복 진입 방지용)
-     */
-    void saveUserContent(String userUuid, String contentId);
-
-    /**
-     * 유저가 이미 대기열/진행열에 존재하는지 확인합니다.
-     */
-    Boolean hasUser(String userUuid);
 
     /**
      * 유저의 ContentId를 조회합니다.
@@ -67,16 +55,6 @@ public interface WaitingQueueRepository {
         선택한 상위 대기열을 가져오는 메서드
      */
     Set<ZSetOperations.TypedTuple<String>> popMin(String key, int count);
-
-    void issueEnterTicket(String key, int ttl);
-
-    Boolean isActiveUser(String key);
-
-    void activeContent(String contentId);
-
-    void issueTokenKey(String tokenKey, String userUuidAndContentId, int ttl);
-
-    String getValue(String key);
 
     Long enterQueueAtomically(String waitKey, String tokenKey, String tokenValue, String contentId, String userUuid, long nowMillis, int tokenTtlSeconds);
 
