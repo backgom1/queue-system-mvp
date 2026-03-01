@@ -2,6 +2,7 @@ package learn.queuesystem.domain.queue;
 
 import org.springframework.data.redis.core.ZSetOperations;
 
+import java.util.List;
 import java.util.Set;
 
 public interface WaitingQueueRepository {
@@ -77,5 +78,13 @@ public interface WaitingQueueRepository {
 
     String getValue(String key);
 
-    long countKeysByPattern(String pattern);
+    Long enterQueueAtomically(String waitKey, String tokenKey, String tokenValue, String contentId, String userUuid, long nowMillis, int tokenTtlSeconds);
+
+    void issueEnterTicketsInPipeline(String contentId, Set<String> userIds, int ttlSeconds);
+
+    List<String> findQueueStatusByToken(String tokenKey);
+
+    long countActiveTicketsV2(String contentId, long nowMillis);
+
+    long countActiveTokensV2(long nowMillis);
 }

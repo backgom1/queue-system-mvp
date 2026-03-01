@@ -25,4 +25,8 @@ public record QueueKeyGenerator() {
         return TOKEN_WAIT.getKey() + ":" + token;
     }
 
+    public static String activeTicketZsetKey(String contentId) {
+        return "queue:v2:active:" + contentId;
+    }
+
 }

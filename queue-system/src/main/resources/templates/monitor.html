@@ -14,6 +14,10 @@
             <h1 class="display-5">Queue System V2 Dashboard</h1>
             <p class="lead mb-0">contentId: <span id="contentIdLabel">concert-iu-2025</span></p>
         </div>
+        <div class="col-auto d-flex align-items-center gap-2">
+            <span id="monitorModeLabel" class="badge text-bg-secondary">MONITOR OFF</span>
+            <button id="btnToggleMonitor" class="btn btn-sm btn-outline-light">Turn ON</button>
+        </div>
     </div>
 
     <div class="row mb-4 text-center">
@@ -55,10 +59,14 @@
 <script>
     const CONTENT_ID = 'concert-iu-2025';
     document.getElementById('contentIdLabel').innerText = CONTENT_ID;
+    const monitorModeLabel = document.getElementById('monitorModeLabel');
+    const btnToggleMonitor = document.getElementById('btnToggleMonitor');
 
     const waitCountEl = document.getElementById('waitCount');
     const activeTicketCountEl = document.getElementById('activeTicketCount');
     const activeTokenCountEl = document.getElementById('activeTokenCount');
+    let monitorTimer = null;
+    let monitorOn = false;
 
     const ctx = document.getElementById('queueChart').getContext('2d');
     const chart = new Chart(ctx, {
@@ -135,8 +143,32 @@
         }
     }
 
-    setInterval(updateStats, 3000);
-    updateStats();
+    function setMonitorMode(on) {
+        monitorOn = on;
+        if (monitorTimer) {
+            clearInterval(monitorTimer);
+            monitorTimer = null;
+        }
+
+        if (monitorOn) {
+            monitorModeLabel.className = 'badge text-bg-success';
+            monitorModeLabel.innerText = 'MONITOR ON';
+            btnToggleMonitor.innerText = 'Turn OFF';
+            updateStats();
+            monitorTimer = setInterval(updateStats, 3000);
+        } else {
+            monitorModeLabel.className = 'badge text-bg-secondary';
+            monitorModeLabel.innerText = 'MONITOR OFF';
+            btnToggleMonitor.innerText = 'Turn ON';
+        }
+    }
+
+    btnToggleMonitor.addEventListener('click', () => {
+        setMonitorMode(!monitorOn);
+    });
+
+    // 기본값: OFF (성능 테스트 시 모니터 부하 분리 목적)
+    setMonitorMode(false);
 </script>
 </body>
 </html>

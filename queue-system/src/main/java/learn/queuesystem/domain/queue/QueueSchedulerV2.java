@@ -8,6 +8,7 @@ import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.util.HashSet;
 import java.util.Set;
 
 
@@ -38,12 +39,17 @@ public class QueueSchedulerV2 {
             String waitKey = QueueKeyGenerator.getWaitKey(activeContent);
 
             Set<ZSetOperations.TypedTuple<String>> queueWaitUsers = waitingQueueRepository.popMin(waitKey, allowCount);
-
-            for (ZSetOperations.TypedTuple<String> tuple : queueWaitUsers) {
-                String userId = tuple.getValue();
-                String key = QueueKeyGenerator.activeContentIdUserId(activeContent, userId);
-                waitingQueueRepository.issueEnterTicket(key, 30);
+            if (queueWaitUsers == null || queueWaitUsers.isEmpty()) {
+                continue;
             }
+
+            Set<String> userIds = new HashSet<>();
+            for (ZSetOperations.TypedTuple<String> tuple : queueWaitUsers) {
+                if (tuple != null && tuple.getValue() != null) {
+                    userIds.add(tuple.getValue());
+                }
+            }
+            waitingQueueRepository.issueEnterTicketsInPipeline(activeContent, userIds, 30);
         }
 
     }
