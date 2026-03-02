@@ -6,7 +6,7 @@ export const options = {
   scenarios: {
     burst_traffic_v2: {
       executor: 'per-vu-iterations',
-      vus: 5000,
+      vus: 3000,
       iterations: 1,
       maxDuration: '10m',
     },

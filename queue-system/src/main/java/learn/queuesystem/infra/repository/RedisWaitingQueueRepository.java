@@ -29,6 +29,7 @@ public class RedisWaitingQueueRepository implements WaitingQueueRepository {
     private static final String ACTIVE_EXPIRATION_KEY = "queue:active:expiration";
     private static final String DONE_COUNT_KEY = "queue:done:total";
     private static final String V2_TOKEN_EXP_KEY = "queue:v2:token:exp";
+
     private static final DefaultRedisScript<Long> ENTER_QUEUE_SCRIPT = new DefaultRedisScript<>(
             """
             redis.call('ZADD', KEYS[1], ARGV[1], ARGV[2])
@@ -40,6 +41,7 @@ public class RedisWaitingQueueRepository implements WaitingQueueRepository {
             """,
             Long.class
     );
+
     private static final DefaultRedisScript<List> STATUS_BY_TOKEN_SCRIPT = new DefaultRedisScript<>(
             """
             local tokenValue = redis.call('GET', KEYS[1])
@@ -203,7 +205,7 @@ public class RedisWaitingQueueRepository implements WaitingQueueRepository {
     @Override
     public List<String> findQueueStatusByToken(String tokenKey) {
         String token = tokenKey.substring(tokenKey.lastIndexOf(':') + 1);
-        List<String> keys = List.of(tokenKey);
+
         List<?> result = redisTemplate.execute(
                 STATUS_BY_TOKEN_SCRIPT,
                 List.of(tokenKey, V2_TOKEN_EXP_KEY),
