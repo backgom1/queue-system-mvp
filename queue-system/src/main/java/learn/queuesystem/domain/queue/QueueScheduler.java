@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -43,10 +44,9 @@ public class QueueScheduler {
     @Scheduled(fixedDelay = 1000)
     public void scheduleActivation() {
         Timer.Sample sample = Timer.start(meterRegistry);
-        Random random = new Random();
 
         //TODO : 해당 로직을 추후에 예매 페이지의 접근 수를 체크하여 허용되는 카운트로 변환되도록 작업을 변경 고려
-        int allowCount = random.nextInt(11) + 30;
+        int allowCount = 100;
         try {
             queueService.activateTokens(allowCount);
             queueService.completeExpiredTokens(); // 추가: 완료 처리 시뮬레이션
