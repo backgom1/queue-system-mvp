@@ -31,7 +31,7 @@ public class QueueSchedulerV2 {
     @Scheduled(fixedDelay = 1000)
     public void queueActivation() {
 
-        int allowCount = 100;
+        int allowCount = 200;
 
         Set<String> activeContents = waitingQueueRepository.getActiveContents();
 

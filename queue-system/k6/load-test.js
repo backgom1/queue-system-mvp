@@ -6,7 +6,7 @@ export const options = {
   scenarios: {
     burst_traffic: {
       executor: 'per-vu-iterations',
-      vus: 5000,               // 500명의 유저가 동시에 (거의 동시에)
+      vus: 10000,               // 500명의 유저가 동시에 (거의 동시에)
       iterations: 1,          // 딱 1번만 실행하고 종료 (계속 새로운 유저 생성 X)
       maxDuration: '10m',     // 테스트 최대 시간 (모두 처리될 때까지 넉넉히)
     },

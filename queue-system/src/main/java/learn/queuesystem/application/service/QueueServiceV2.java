@@ -72,11 +72,15 @@ public class QueueServiceV2 {
 
     private NextPollTime calculateNextPoll(long rank) {
         if (rank > 10000) {
-            return NextPollTime.NEXT_POLL_TIME_HIGH;
+            return NextPollTime.NEXT_POLL_TIME_LEVEL_4;
         }
         if (rank > 5000) {
-            return NextPollTime.NEXT_POLL_TIME_MEDIUM;
+            return NextPollTime.NEXT_POLL_TIME_LEVEL_3;
         }
-        return NextPollTime.NEXT_POLL_TIME_LOW;
+        if (rank > 100) {
+            return NextPollTime.NEXT_POLL_TIME_LEVEL_2;
+        }
+        return NextPollTime.NEXT_POLL_TIME_LEVEL_1;
     }
+
 }

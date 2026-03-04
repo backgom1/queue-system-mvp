@@ -5,9 +5,10 @@ import lombok.Getter;
 @Getter
 public enum NextPollTime {
 
-    NEXT_POLL_TIME_HIGH(1),
-    NEXT_POLL_TIME_MEDIUM(3),
-    NEXT_POLL_TIME_LOW(10);
+    NEXT_POLL_TIME_LEVEL_1(1_000),
+    NEXT_POLL_TIME_LEVEL_2(3_000),
+    NEXT_POLL_TIME_LEVEL_3(10_000),
+    NEXT_POLL_TIME_LEVEL_4(15_000);
 
     private final int nextTime;
 
